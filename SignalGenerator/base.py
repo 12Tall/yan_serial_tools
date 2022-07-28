@@ -1,74 +1,87 @@
-from datetime import datetime
+import abc
 from threading import Event, Thread
-from time import sleep
 
 
-class IPort(object):
+class IPort(abc.ABC):
     """
-    IPort 输出接口
-    需要重写接口函数
+    IPort 信号发生器的输出接口    
+    内置了一个状态标志self._is_on = False
     """
 
     def __init__(self) -> None:
+        super().__init__()
         self._is_on = False
-        pass
 
+    @abc.abstractmethod
     def turn_on(self):
-        # 模拟端口打开，需要避免重复打开
-        if not self._is_on:
-            self._is_on = True
+        """
+        打开端口，而且只能打开一次。
+        最后需要修改self._is_on = True
+        """
 
+    @abc.abstractmethod
     def turn_off(self):
-        # 端口关闭
-        self._is_on = False
+        """
+        关闭端口。
+        需要修改self._is_on = False 
+        """
 
-    def wait_writable(self):  # 等待端口可用
-        while True:
-            sleep(0.5)
-            break
+    @abc.abstractmethod
+    def wait_port_available(self):  # 等待端口可用
+        """
+        等待端口可用
+        """
 
-    def write(self, data: any):
-        print("[%s] Port send: %s" % (datetime.now(), data))
+    @abc.abstractmethod
+    def send_data(self, data: any):  # 等待端口可用
+        """
+        向端口写入数据
+        """
 
-    ##################################################
-    # send 方法可以不用重写
-    ##################################################
     def send(self, data: any):
-        # 模拟端口发送数据的过程
-        if self._is_on:  # 模拟检查端口状态，如果端口已关闭就不再发送
-            self.wait_writable()
-            self.write(data)
+        if self._is_on:
+            self.wait_port_available()
+            self.send_data(data)
+        else:
+            raise IOError("端口未打开或不可用")
 
 
-class IGenerator(object):
+class IGenerator(abc.ABC):
     """
-    IGenerator 只包含信号产生与发送的关键方法
+    IGenerator 抽象类，包含最基本的发送数据的接口函数。
+    而在send 方法中应首先生成数据  
     """
 
-    def __init__(self, port: IPort = IPort()) -> None:
-        self.port = port  # 定义输出端口
-        pass
+    @abc.abstractmethod
+    def __init__(self):
+        """
+        初始化信号发生器
+        """
 
-    def reset(self):
-        pass
-
-    def generate_data(self):
-        pass
-
-    def send(self):
-        self.port.send()
+    @abc.abstractmethod
+    def send_data(self):
+        """
+        核心函数：用于生成并发送数据
+        """
 
 
-class Executor(Thread):
+class Engine(Thread):
     """
-    信号发生器独立线程，主要包含以下方法用于线程的控制：  
-    0. start   线程的默认方法，只能被调用一次
-    1. resume  开始输出，因为start 方法已经被占用，这里只好用resume    
-    2. pause   暂停输出  
-    3. stop    停止输出
+    Engine 相当于信号发生器的CPU  
+    比较绕的逻辑是：  
+      Engine 每一步都会调用信号发生器生成数据，但逻辑上信号发生器是包含Engine 的
+      于是便形成了循环引用的代码结构              
     """
 
     def __init__(self, generator: IGenerator):
+        """
+        初始化：
+        1. 设置为守护线程，跟随主线程退出  
+        2. 指定函数发生器实例对象  
+        3. self.pause_flag = Event() 默认为False，会造成self.pause_flag.wait 方法阻塞  
+        4. self.stop_flag = Event() 默认为False，会造成self.stop_flag.wait 方法阻塞
+
+        """
         Thread.__init__(self)
         self.daemon = True  # 设置为守护线程，当主线程退出时自动结束
         self.generator = generator
@@ -76,37 +89,40 @@ class Executor(Thread):
         self.stop_flag = Event()
 
     def resume(self):
+        """
+        设置暂停标志为True，使代码继续运行
+        """
         self.pause_flag.set()
 
     def pause(self):
+        """
+        设置暂停标志为False，使代码继续阻塞
+        """
         self.pause_flag.clear()
 
     def stop(self):
+        """
+        设置停止标志为True，结束线程
+        """
         self.stop_flag.set()
 
     def run(self):
         while True:
-            self.pause_flag.wait()
+            self.pause_flag.wait()  # 暂停线程
             if self.stop_flag.is_set():
-                break
-            self.generator.send()
+                break  # 退出线程
+            self.generator.send_data()  # 生成并发送数据
 
 
-class BaseGenerator(IGenerator):
+class Generator(IGenerator):
     """
-    信号发生器基类，其子类需要重写：  
-    1. reset 方法  
-    2. generate_data 方法
-    3. send 方法，需要在send 方法中调用self.port.send 向实际接口发送数据
-
-    可直接调用的方法：  
-    1. turn_on 开启但无输出，此方法只能执行一次  
-    2. resume  开始输出  
-    3. pause   暂停输出  
-    4. stop    停止输出
+    Generator 信号发生器基类，内置了：
+    1. 一个计数器self.counter = 0. 用于生成输出信号的函数中  
+    2. 一个状态标志self._is_on = False 
+    3. 一个CPU self.engine = Engine(self) 用于循环生成并发送数据
     """
 
-    def __init__(self, deltaT=0.001, port: IPort = IPort()) -> None:
+    def __init__(self, port: IPort, deltaT=0.001) -> None:
         """
         deltaT: 采样周期，单位是s
         """
@@ -115,37 +131,53 @@ class BaseGenerator(IGenerator):
         self._is_on = False
         self.counter = 0.
         self.deltaT = deltaT
-        self.exe = Executor(self)
+        self.engine = Engine(self)
 
+    @abc.abstractmethod
     def generate_data(self):
-        self.counter += self.deltaT
+        """
+        数据生成，可以使用信号发生器对象中的所有属性
+        """
 
+    @abc.abstractmethod
     def reset(self):
-        self.counter = 0.
+        """
+        重置信号发生器  
+        """
 
-    def send(self):
-        self.port.turn_on()   # 保证端口已经打开
-        self.generate_data()  # 生成信号
-        self.port.send(self.counter)  # 模拟发送数据
-
-    ###########################################################
-    # 将Executor 嵌套进信号发生器，将会使我们的代码更整洁
-    # 而且只需要在基类中定义一次以下方法就好了
-    ###########################################################
+    @abc.abstractmethod
+    def send_data(self):
+        """
+        发送数据，记得在send 函数开始先调用self.generate_data()  
+        """
 
     def turn_on(self):
+        """
+        信号发生器启动，但并不开始运行
+        """
         if not self._is_on:
-            self.exe.start()  # 开启线程，此方法只能执行一次
+            self.engine.start()  # 开启线程，此方法只能执行一次
             self._is_on = True
+        else:
+            raise RuntimeError("信号发生器不能重复打开")
 
     def resume(self):
-        self.exe.resume()
+        """
+        信号发生器开始（继续）运行
+        """
+        self.engine.resume()
 
     def pasue(self):
-        self.exe.pause()
+        """
+        信号发生器暂停运行
+        """
+        self.engine.pause()
 
     def stop(self):
-        self.exe.stop()
+        """
+        信号发生器停止运行，此操作会更换engine 线程，但是没啥影响
+        """
+        self.engine.stop()
         self.port.turn_off()
-        self.exe = Executor(self)  # 为开始新一轮任务做准备
+        self.engine = Engine(self)  # 为开始新一轮任务做准备
         self._is_on = False

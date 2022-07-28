@@ -1,21 +1,16 @@
+
 from time import sleep
-from SignalGenerator import BaseGenerator
+from SignalGenerator import DefaultGenerator, DefaultPort
 
-if __name__ == "__main__":
-    bg = BaseGenerator()
 
-    bg.turn_on()  # 开启
-    bg.resume()   # 开始输出
-    sleep(3)
+dg = DefaultGenerator(DefaultPort())
 
-    bg.pasue()    # 暂停
-    sleep(3)
+dg.turn_on()
+# dg.turn_on()
+dg.resume()
 
-    bg.resume()   # 继续输出
-    sleep(1.5)
-
-    bg.reset()    # 中间重置状态
-    sleep(2.5)
-
-    bg.stop()     # 停止
-    sleep(3)
+sleep(3)
+dg.pasue()
+sleep(3)
+dg.resume()
+sleep(3)
