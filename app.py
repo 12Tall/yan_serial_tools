@@ -1,7 +1,6 @@
 from time import sleep
 from SignalGenerator import BaseGenerator
 
-
 if __name__ == "__main__":
     bg = BaseGenerator()
 
