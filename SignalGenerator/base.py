@@ -2,35 +2,29 @@ import abc
 from threading import Event, Thread
 from typing import List, Union
 
-from matplotlib.pyplot import cla
-
 
 class IPort(abc.ABC):
     """
     IPort 信号发生器的输出接口    
-    内置了一个状态标志self._is_on = False
+    内置了一个状态标志
     """
 
     def __init__(self) -> None:
         super().__init__()
-        self._is_on = False
 
     @abc.abstractmethod
     def turn_on(self):
         """
         打开端口，而且只能打开一次。
-        最后需要修改self._is_on = True
+        最后需要修改
         """
-        if not self._is_on:
-            self._is_on = True
 
     @abc.abstractmethod
     def turn_off(self):
         """
         关闭端口。
-        需要修改self._is_on = False 
+        需要修改
         """
-        self._is_on = False
 
     @abc.abstractmethod
     def wait_port_available(self):  # 等待端口可用
@@ -49,11 +43,8 @@ class IPort(abc.ABC):
         """
         等待端口可用后写入数据
         """
-        if self._is_on:
-            self.wait_port_available()
-            self.send_data(data)
-        else:
-            raise IOError("端口未打开或不可用")
+        self.wait_port_available()
+        self.send_data(data)
 
 
 class IFunction(abc.ABC):
@@ -160,6 +151,7 @@ class Generator(Thread):
             self.pause_flag.wait()  # 暂停线程
             if self.stop_flag.is_set():
                 break  # 退出线程
+
             data = [func.call() for func in self.funcs]
             for port in self.ports:
                 port.send(data)

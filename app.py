@@ -1,11 +1,10 @@
 
 
 from time import sleep
-from SignalGenerator import Generator, DefaultFunction, DefaultPort, DIntTFunction, CIntTFunction
+from SignalGenerator import Generator, SinFunction, SerialPort
 
 
-bg = Generator(0.1, [DefaultFunction(), DIntTFunction(),
-               CIntTFunction()], DefaultPort())
+bg = Generator(1, [SinFunction()], [SerialPort("COM6", 9600,)])
 bg.turn_on()  # 开启
 bg.resume()   # 开始输出
 sleep(3)
