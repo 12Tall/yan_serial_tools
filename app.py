@@ -1,16 +1,23 @@
 
+
 from time import sleep
-from SignalGenerator import DefaultGenerator, DefaultPort
+from SignalGenerator import Generator, DefaultFunction, DefaultPort, DIntTFunction, CIntTFunction
 
 
-dg = DefaultGenerator(DefaultPort())
-
-dg.turn_on()
-# dg.turn_on()
-dg.resume()
-
+bg = Generator(0.1, [DefaultFunction(), DIntTFunction(),
+               CIntTFunction()], DefaultPort())
+bg.turn_on()  # 开启
+bg.resume()   # 开始输出
 sleep(3)
-dg.pasue()
+
+bg.pause()    # 暂停
 sleep(3)
-dg.resume()
+
+bg.resume()   # 继续输出
+sleep(5)
+
+bg.reset()    # 中间重置状态
+sleep(2.5)
+
+bg.stop()     # 停止
 sleep(3)

@@ -1,3 +1,3 @@
-from SignalGenerator.base import IPort, Generator
+from SignalGenerator.base import Generator
 from SignalGenerator.ports import *
-from SignalGenerator.generators import *
+from SignalGenerator.functions import *

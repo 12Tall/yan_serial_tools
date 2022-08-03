@@ -12,14 +12,12 @@ class DefaultPort(IPort):
 
     def __init__(self) -> None:
         super().__init__()
-        self._is_on = False
 
     def turn_on(self):
-        if not self._is_on:
-            self._is_on = True
+        return super().turn_on()
 
     def turn_off(self):
-        self._is_on = False
+        return super().turn_off()
 
     def wait_port_available(self):
         while True:
